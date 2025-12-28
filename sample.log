@@ -1,0 +1,4 @@
+127.0.0.1 - - [10/Oct/2025] "GET /index.html HTTP/1.1" 200
+127.0.0.1 - - [10/Oct/2025] "GET /about.html HTTP/1.1" 200
+127.0.0.1 - - [10/Oct/2025] "POST /login HTTP/1.1" 200
+127.0.0.1 - - [10/Oct/2025] "GET /contact HTTP/1.1" 200
