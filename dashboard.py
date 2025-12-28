@@ -11,146 +11,42 @@ st.set_page_config(
     page_icon="🚨"
 )
 
-# ---------------- WHITE MODE CSS ----------------
+# ---------------- AUTO REFRESH ----------------
+st_autorefresh(interval=5000, key="refresh")
+
+# ---------------- CSS (WHITE THEME) ----------------
 st.markdown("""
 <style>
+.stApp { background-color: #ffffff; color: #0d1117; }
+section[data-testid="stSidebar"] { background-color: #f6f8fa; }
+section[data-testid="stSidebar"] * { color: #0d1117 !important; }
+h1, h2 { color: #0969da !important; }
 
-/* Main app background */
-.stApp {
-    background-color: #ffffff;
-    color: #0d1117;
-}
-
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background-color: #f6f8fa;
-    color: #0d1117;
-}
-
-/* Sidebar text */
-section[data-testid="stSidebar"] * {
-    color: #0d1117 !important;
-}
-
-/* Headers */
-h1, h2, h3, h4, h5, h6 {
-    color: #0969da !important;
-    font-weight: 600;
-}
-
-/* Normal text */
-p, span, label, div {
-    color: #0d1117;
-}
-
-/* Metric cards */
 div[data-testid="stMetric"] {
-    background-color: #ffffff;
-    padding: 18px;
-    border-radius: 12px;
+    background-color: white;
+    padding: 16px;
+    border-radius: 10px;
     border: 1px solid #d0d7de;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
 
-/* Metric labels */
-div[data-testid="stMetricLabel"] {
-    color: #57606a !important;
-}
-
-/* Buttons */
-.stButton > button {
-    background-color: #0969da;
-    color: #ffffff !important;
-    border-radius: 8px;
-    border: none;
-    font-weight: 600;
-}
-
-/* Slider */
-div[data-baseweb="slider"] * {
-    color: #0d1117 !important;
-}
-
-/* Alerts */
 .stAlert {
     background-color: #fff5f5 !important;
     color: #cf222e !important;
     border: 1px solid #cf222e;
 }
-
-/* Tables */
-thead tr th {
-    background-color: #f6f8fa !important;
-    color: #0969da !important;
-    font-weight: 600;
-}
-
-tbody tr td {
-    background-color: #ffffff !important;
-    color: #0d1117 !important;
-}
-
-/* Streamlit top bar */
-header, header * {
-    background-color: #ffffff !important;
-    color: #0d1117 !important;
-}
-
-/* Footer */
-footer {
-    visibility: hidden;
-}
-
-/* ========================= */
-/* THREE-DOTS MENU */
-/* ========================= */
-div[data-baseweb="popover"] {
-    background-color: #ffffff !important;
-}
-
-div[role="menu"] {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-}
-
-div[role="menu"] * {
-    color: #000000 !important;
-    font-weight: 500;
-}
-
-div[role="menu"] div:hover {
-    background-color: #f6f8fa !important;
-}
-
-/* ========================= */
-/* DATAFRAME DOWNLOAD */
-/* ========================= */
-button[data-testid="stDownloadButton"] {
-    background-color: #f6f8fa !important;
-    color: #0d1117 !important;
-    border: 1px solid #d0d7de;
-}
-
-button[data-testid="stDownloadButton"] svg {
-    fill: #0d1117 !important;
-}
-
-button[data-testid="stDownloadButton"]:hover {
-    background-color: #eaeef2 !important;
-}
-
-/* Dataframe container */
-div[data-testid="stDataFrame"] {
-    border-radius: 12px;
-    border: 1px solid #d0d7de;
-    background-color: #ffffff;
-}
-
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- AUTO REFRESH ----------------
-st_autorefresh(interval=5000, key="refresh")
+# ---------------- TTS FUNCTION ----------------
+def tts_speak(text):
+    js = f"""
+    <script>
+    var msg = new SpeechSynthesisUtterance("{text}");
+    msg.lang = 'en-US';
+    window.speechSynthesis.speak(msg);
+    </script>
+    """
+    st.components.v1.html(js, height=0)
 
 # ---------------- TITLE ----------------
 st.title("🚨 Sentinel Log Anomaly Detection Dashboard")
@@ -158,12 +54,8 @@ st.caption("Real-time Security Monitoring System")
 
 # ---------------- SIDEBAR ----------------
 st.sidebar.header("⚙ Control Panel")
-anomaly_threshold = st.sidebar.slider(
-    "Anomaly Probability (%)",
-    min_value=10,
-    max_value=90,
-    value=40
-)
+anomaly_threshold = st.sidebar.slider("Anomaly Probability (%)", 10, 90, 40)
+enable_voice = st.sidebar.checkbox("🗣️ Enable Voice Alerts", value=False)
 
 # ---------------- LOG GENERATOR ----------------
 def generate_log():
@@ -180,6 +72,9 @@ def generate_log():
 if "logs" not in st.session_state:
     st.session_state.logs = []
 
+if "last_alert_ts" not in st.session_state:
+    st.session_state.last_alert_ts = None
+
 st.session_state.logs.append(generate_log())
 df = pd.DataFrame(st.session_state.logs[-20:])
 
@@ -190,12 +85,17 @@ normal = total_logs - anomalies
 
 c1, c2, c3 = st.columns(3)
 c1.metric("📄 Total Logs", total_logs)
-c2.metric("🚨 Anomalies Detected", anomalies)
+c2.metric("🚨 Anomalies", anomalies)
 c3.metric("✅ Normal Events", normal)
 
-# ---------------- ALERT ----------------
+# ---------------- ALERT + VOICE ----------------
 if df.iloc[-1]["Anomaly"] == "YES":
+    ts = df.iloc[-1]["Timestamp"]
     st.error("🚨 CRITICAL ALERT: Suspicious activity detected!")
+
+    if enable_voice and st.session_state.last_alert_ts != ts:
+        tts_speak("Warning. Anomaly detected in system logs.")
+        st.session_state.last_alert_ts = ts
 
 # ---------------- TABLE ----------------
 st.subheader("📊 Recent Log Activity")
